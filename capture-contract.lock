@@ -1,0 +1,5 @@
+contracts_revision=8fc87108962db3be584d21064088201f7a226a3c
+module=com.chromascape.contracts:ai-routine-capture-contract
+module_version=1.0.0-sc968-b58e569ecd00
+source_tree_sha256=sha256:b58e569ecd00a896ac122700ff68f04eff67846e0e809fec8e5d9506eccae6ae
+protocol=runelite-capture/v1

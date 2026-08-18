@@ -25,6 +25,16 @@
 
 dependencyResolutionManagement {
     repositories {
+        val sc968Repository = System.getenv("SC968_MAVEN_REPO")
+        if (!sc968Repository.isNullOrBlank()) {
+            maven(uri(sc968Repository)) {
+                name = "sc968CaptureContracts"
+                content { includeGroup("com.chromascape.contracts") }
+            }
+        }
+        mavenLocal {
+            content { includeGroup("com.chromascape.contracts") }
+        }
         maven(uri("https://repo.runelite.net")) {
             name = "rrn"
 

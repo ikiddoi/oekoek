@@ -24,6 +24,7 @@
  */
 
 import java.io.ByteArrayOutputStream
+import java.util.Properties
 
 plugins {
     java
@@ -45,6 +46,13 @@ java {
 }
 
 dependencies {
+    val captureContractLock = Properties().apply {
+        rootProject.file("capture-contract.lock").inputStream().use(::load)
+    }
+    val captureContractVersion = providers.environmentVariable("SC968_CAPTURE_CONTRACT_VERSION")
+        .getOrElse(captureContractLock.getProperty("module_version"))
+    implementation("com.chromascape.contracts:ai-routine-capture-contract:$captureContractVersion")
+
     api("net.runelite:runelite-api:${project.version}")
     implementation(project(":jshell"))
     runtimeOnly("net.runelite:injected-client:${project.version}")
