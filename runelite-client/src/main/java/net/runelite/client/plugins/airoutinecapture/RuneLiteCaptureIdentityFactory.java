@@ -10,15 +10,23 @@ import java.security.MessageDigest;
 import net.runelite.client.RuneLiteProperties;
 
 public final class RuneLiteCaptureIdentityFactory {
-  public CaptureIdentity initial(String configuredJson) {
-    if (configuredJson == null || configuredJson.isBlank()) throw new IllegalArgumentException("capture identity is required");
-    JsonObject identity = JsonCaptureCodec.parse(configuredJson).getAsJsonObject();
-    JsonObject client = identity.getAsJsonObject("client");
-    client.addProperty("client_kind", "RUNELITE_CAPTURE"); client.addProperty("adapter_contract", "runelite-capture/v1"); client.addProperty("domain", "RUNELITE");
-    client.addProperty("client_build_id", RuneLiteProperties.getCommit() == null ? RuneLiteProperties.getVersion() : RuneLiteProperties.getCommit()); client.addProperty("artifact_digest", artifactDigest());
-    identity.remove("run"); identity.remove("candidate"); identity.addProperty("control_allowed", false);
+  public CaptureIdentity initial(String taskKey, String settingsHash, String profileId,
+      String profileHash, String catalogHash, String clientId) {
+    JsonObject identity = new JsonObject();
+    identity.addProperty("schema", "current-slice-identity/v1");
+    JsonObject task = new JsonObject();
+    task.addProperty("task_key", required(taskKey, "task_key"));
+    task.addProperty("settings_hash", required(settingsHash, "settings_hash"));
+    task.addProperty("profile_id", required(profileId, "profile_id"));
+    task.addProperty("profile_hash", required(profileHash, "profile_hash"));
+    task.addProperty("catalog_hash", required(catalogHash, "catalog_hash"));
+    identity.add("task", task);
+    JsonObject client = new JsonObject();
+    client.addProperty("client_id", required(clientId, "client_id")); client.addProperty("client_kind", "RUNELITE_CAPTURE"); client.addProperty("client_build_id", RuneLiteProperties.getCommit() == null ? RuneLiteProperties.getVersion() : RuneLiteProperties.getCommit()); client.addProperty("artifact_digest", artifactDigest()); client.addProperty("adapter_contract", "runelite-capture/v1"); client.addProperty("domain", "RUNELITE");
+    identity.add("client", client); identity.addProperty("control_allowed", false);
     return CaptureIdentity.forCreation(JsonCaptureCodec.encode(identity));
   }
+  private static String required(String value, String field) { if (value == null || value.isBlank()) throw new IllegalArgumentException("IDENTITY_" + field.toUpperCase() + "_REQUIRED"); return value; }
   public String artifactDigest() {
     try {
       Path location = Path.of(RuneLiteCaptureIdentityFactory.class.getProtectionDomain().getCodeSource().getLocation().toURI()); MessageDigest digest = MessageDigest.getInstance("SHA-256");

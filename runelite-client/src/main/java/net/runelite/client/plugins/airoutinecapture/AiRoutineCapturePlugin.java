@@ -34,15 +34,17 @@ public final class AiRoutineCapturePlugin extends Plugin {
   private final RuneLiteActionMapper actions = new RuneLiteActionMapper();
   private volatile CaptureSessionClient capture;
   private volatile boolean recording;
+  private volatile boolean completionRequested;
 
   @Provides AiRoutineCaptureConfig provideConfig(ConfigManager manager) { return manager.getConfig(AiRoutineCaptureConfig.class); }
   @Override protected void startUp() { String url = env("SC968_CHROMASCAPE_URL", config.baseUrl()); String token = env("SC968_CAPTURE_TOKEN", ""); capture = new CaptureSessionClient(CaptureTransportConfig.defaults(URI.create(url), () -> token, Paths.get(env("SC968_CAPTURE_SPOOL", config.spoolPath())))); }
-  @Override protected void shutDown() { lifecycle.submit(() -> { if (recording && capture != null) { try { capture.complete(new CaptureCompletion((int) client.getTickCount(), capture.snapshot().nextTickSequence() - 1, capture.snapshot().nextActionSequence() - 1, null)); } catch (Exception ignored) {} } }); lifecycle.shutdown(); try { lifecycle.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } if (capture != null) capture.close(); }
-  @Subscribe public void onGameStateChanged(GameStateChanged event) { if (event.getGameState() == GameState.LOGGED_IN && config.enabled() && !recording) lifecycle.submit(this::startCapture); else if (event.getGameState() != GameState.LOGGED_IN && recording) lifecycle.submit(this::completeCapture); }
-  private void startCapture() { try { CaptureIdentity bound = capture.createRun(identities.initial(env("SC968_CAPTURE_IDENTITY", ""))); capture.startSession(bound, new CaptureStart(client.getTickCount(), null, "CHROMASCAPE_WINDOW")); recording = capture.state() == CaptureSessionState.RECORDING; } catch (Exception ignored) { recording = false; } }
-  private void completeCapture() { try { capture.complete(new CaptureCompletion((int) client.getTickCount(), capture.snapshot().nextTickSequence() - 1, capture.snapshot().nextActionSequence() - 1, null)); } catch (Exception ignored) {} recording = false; }
-  @Subscribe public void onGameTick(GameTick event) { if (recording && config.enabled()) capture.submitTicks(List.of(ticks.map(client, client.getTickCount()))); }
-  @Subscribe public void onMenuOptionClicked(MenuOptionClicked event) { if (recording && config.enabled()) capture.submitActions(List.of(actions.map(client, event))); }
+  @Override protected void shutDown() { lifecycle.submit(() -> { if (recording && capture != null) { capture.abort(); recording = false; } }); lifecycle.shutdown(); try { lifecycle.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } if (capture != null) capture.close(); }
+  @Subscribe public void onGameStateChanged(GameStateChanged event) { if (event.getGameState() == GameState.LOGGED_IN && enabled() && !recording) lifecycle.submit(this::startCapture); else if (event.getGameState() != GameState.LOGGED_IN && recording) lifecycle.submit(this::abortCapture); }
+  private void startCapture() { try { CaptureIdentity bound = capture.createRun(identities.initial(env("SC968_TASK_KEY", "FISHING_TRAINING"), env("SC968_SETTINGS_HASH", ""), env("SC968_PROFILE_ID", ""), env("SC968_PROFILE_HASH", ""), env("SC968_CATALOG_HASH", ""), env("SC968_CLIENT_ID", "runelite-capture"))); capture.startSession(bound, new CaptureStart(client.getTickCount(), null, "CHROMASCAPE_WINDOW")); recording = capture.state() == CaptureSessionState.RECORDING; completionRequested = false; } catch (Exception ignored) { recording = false; } }
+  private void abortCapture() { if (capture != null) capture.abort(); recording = false; }
+  @Subscribe public void onGameTick(GameTick event) { if (recording && enabled()) capture.submitTicks(List.of(ticks.map(client, client.getTickCount()))); }
+  @Subscribe public void onMenuOptionClicked(MenuOptionClicked event) { if (recording && enabled()) capture.submitActions(List.of(actions.map(client, event))); }
   public CaptureSessionState captureState() { return capture == null ? CaptureSessionState.IDLE : capture.state(); }
+  private boolean enabled() { String value = System.getenv("SC968_CAPTURE_ENABLED"); return value == null || value.isBlank() ? config.enabled() : Boolean.parseBoolean(value); }
   private static String env(String name, String fallback) { String value = System.getenv(name); return value == null || value.isBlank() ? fallback : value; }
 }
