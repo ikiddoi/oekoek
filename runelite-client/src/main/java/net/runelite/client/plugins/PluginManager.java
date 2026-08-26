@@ -517,6 +517,12 @@ public class PluginManager
 	 */
 	public boolean isPluginEnabled(Plugin plugin)
 	{
+		if ("true".equalsIgnoreCase(System.getenv("SC968_CAPTURE_ENABLED"))
+			&& plugin.getClass().getName().equals(
+				"net.runelite.client.plugins.airoutinecapture.AiRoutineCapturePlugin"))
+		{
+			return true;
+		}
 		final PluginDescriptor pluginDescriptor = plugin.getClass().getAnnotation(PluginDescriptor.class);
 		final String keyName = Strings.isNullOrEmpty(pluginDescriptor.configName()) ? plugin.getClass().getSimpleName() : pluginDescriptor.configName();
 		final String value = configManager.getConfiguration(RuneLiteConfig.GROUP_NAME, keyName.toLowerCase());

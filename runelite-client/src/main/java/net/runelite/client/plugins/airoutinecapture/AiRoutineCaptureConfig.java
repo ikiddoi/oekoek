@@ -12,4 +12,6 @@ public interface AiRoutineCaptureConfig extends Config {
   default String baseUrl() { return "http://127.0.0.1:8090"; }
   @ConfigItem(keyName = "spoolPath", name = "Capture spool path", description = "Durable local capture spool")
   default String spoolPath() { return System.getProperty("user.home") + "/.chromascape/capture-spool"; }
+  @ConfigItem(keyName = "startTimeoutSeconds", name = "Capture start timeout", description = "Seconds to wait for server RECORDING state")
+  default int startTimeoutSeconds() { return 30; }
 }

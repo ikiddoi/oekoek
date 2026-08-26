@@ -17,5 +17,8 @@ class RuneLiteCaptureSafetyTest {
     assertFalse(text.contains("MouseEvent"));
     assertFalse(text.contains("KeyEvent"));
     assertTrue(text.contains("submitTicks"));
+    assertTrue(text.contains("SC968_CAPTURE_STATUS_FILE"));
+    assertTrue(text.contains("sc968-capture-status/v1"));
+    assertTrue(text.contains("CaptureCompletion"));
   }
 }
