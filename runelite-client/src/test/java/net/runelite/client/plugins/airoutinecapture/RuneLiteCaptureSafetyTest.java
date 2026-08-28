@@ -21,4 +21,16 @@ public class RuneLiteCaptureSafetyTest {
     assertTrue(text.contains("sc968-capture-status/v1"));
     assertTrue(text.contains("CaptureCompletion"));
   }
+
+  /**
+   * The 2026-08-29 acceptance recorded the welcome screen's "CLICK HERE TO PLAY" click as the first
+   * routine action, which made the generated graph unreplayable and would also have tripped the
+   * shadow phase's "gameplay began before the shadow was observable" check.
+   */
+  @Test public void welcomeScreenDismissalIsNotRoutineEvidence() {
+    assertTrue(RuneLiteActionMapper.isLoginCeremony((378 << 16) | 72));
+    // World interactions carry no widget component; other interfaces stay routine evidence.
+    assertFalse(RuneLiteActionMapper.isLoginCeremony(0));
+    assertFalse(RuneLiteActionMapper.isLoginCeremony((149 << 16) | 0));
+  }
 }

@@ -184,6 +184,12 @@ public final class AiRoutineCapturePlugin extends Plugin
 		{
 			return;
 		}
+		// The welcome screen is dismissed after the capture window opens; that click is login
+		// ceremony, not routine evidence, and recording it makes the graph unreplayable.
+		if (RuneLiteActionMapper.isLoginCeremony(event.getParam1()))
+		{
+			return;
+		}
 		completionPolicy.observeAction(client.getTickCount(), event.getMenuOption(), event.getMenuTarget());
 		capture.submitActions(List.of(actions.map(client, event)));
 		publishStatus();
