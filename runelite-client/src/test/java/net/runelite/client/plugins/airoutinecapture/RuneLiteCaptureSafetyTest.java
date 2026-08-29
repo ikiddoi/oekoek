@@ -33,4 +33,19 @@ public class RuneLiteCaptureSafetyTest {
     assertFalse(RuneLiteActionMapper.isLoginCeremony(0));
     assertFalse(RuneLiteActionMapper.isLoginCeremony((149 << 16) | 0));
   }
+  /**
+   * The recording window must open when the harness says the demonstration begins, not at
+   * LOGGED_IN, which fires while the welcome screen is up and several ticks before the operator can
+   * act. Recording that gap put a menu dismissal and three steps toward the fishing spot into the
+   * evidence, and would trip the shadow phase's check that gameplay had not begun yet.
+   */
+  @Test public void theRecordingWindowIsGatedOnTheRoutineNotOnLogin() throws Exception {
+    Path source = Path.of("src/main/java/net/runelite/client/plugins/airoutinecapture/AiRoutineCapturePlugin.java");
+    if (!Files.exists(source)) source = Path.of("runelite-client").resolve(source);
+    String text = Files.readString(source);
+    assertTrue(text.contains("SC968_CAPTURE_START_FILE"));
+    assertTrue(text.contains("maybeStartCapture"));
+    // The status sidecar has to distinguish "not logged in" from "logged in, awaiting the trigger".
+    assertTrue(text.contains("logged_in"));
+  }
 }

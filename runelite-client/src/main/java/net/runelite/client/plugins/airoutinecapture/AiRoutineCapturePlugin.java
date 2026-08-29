@@ -65,6 +65,10 @@ public final class AiRoutineCapturePlugin extends Plugin
 	private volatile boolean completionRequested;
 	private volatile int lastTick;
 	private volatile Path statusPath;
+	private volatile Path startTriggerPath;
+	private volatile boolean loggedIn;
+	private final java.util.concurrent.atomic.AtomicBoolean captureRequested =
+		new java.util.concurrent.atomic.AtomicBoolean();
 
 	@com.google.inject.Provides
 	AiRoutineCaptureConfig provideConfig(ConfigManager manager)
@@ -83,11 +87,11 @@ public final class AiRoutineCapturePlugin extends Plugin
 			? null : Paths.get(configuredStatusPath).toAbsolutePath().normalize();
 		capture = new CaptureSessionClient(CaptureTransportConfig.defaults(
 			URI.create(url), () -> token, Paths.get(spool)));
+		String configuredStartTrigger = System.getenv("SC968_CAPTURE_START_FILE");
+		startTriggerPath = configuredStartTrigger == null || configuredStartTrigger.isBlank()
+			? null : Paths.get(configuredStartTrigger).toAbsolutePath().normalize();
 		publishStatus();
-		if (statusPath != null)
-		{
-			statusWriter.scheduleWithFixedDelay(this::publishStatus, 0, 250, TimeUnit.MILLISECONDS);
-		}
+		statusWriter.scheduleWithFixedDelay(this::onStatusTick, 0, 250, TimeUnit.MILLISECONDS);
 	}
 
 	@Override
@@ -115,14 +119,59 @@ public final class AiRoutineCapturePlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event.getGameState() == GameState.LOGGED_IN && enabled() && !recording)
+		loggedIn = event.getGameState() == GameState.LOGGED_IN;
+		if (loggedIn)
 		{
-			lifecycle.submit(this::startCapture);
+			maybeStartCapture();
+			return;
 		}
-		else if (event.getGameState() != GameState.LOGGED_IN && recording)
+		if (recording)
 		{
 			lifecycle.submit(() -> stopCapture(false));
 		}
+		// Without a trigger the plugin keeps its original behaviour, which includes recapturing
+		// after a reconnect. A triggered run is one demonstration per process and stays latched.
+		if (startTriggerPath == null)
+		{
+			captureRequested.set(false);
+		}
+	}
+
+	private void onStatusTick()
+	{
+		maybeStartCapture();
+		publishStatus();
+	}
+
+	/**
+	 * Opens the recording window when the routine begins, not when the client logs in.
+	 *
+	 * <p>Capture used to start on {@code LOGGED_IN}. That fires while the welcome screen is still up
+	 * and several ticks before the operator can act, and the acceptance does not prompt them to
+	 * demonstrate until later still -- so ordinary pre-routine clicking landed in the recording as
+	 * routine evidence, which also trips the shadow phase's check that gameplay had not begun before
+	 * the shadow was observable.
+	 *
+	 * <p>When {@code SC968_CAPTURE_START_FILE} names a trigger the window opens only once that file
+	 * appears. Without it the previous behaviour is kept.
+	 */
+	private void maybeStartCapture()
+	{
+		if (!enabled() || !loggedIn || recording)
+		{
+			return;
+		}
+		Path trigger = startTriggerPath;
+		if (trigger != null && !Files.exists(trigger))
+		{
+			return;
+		}
+		// The status cadence calls this four times a second; only one may start a session.
+		if (!captureRequested.compareAndSet(false, true))
+		{
+			return;
+		}
+		lifecycle.submit(this::startCapture);
 	}
 
 	private void startCapture()
@@ -150,6 +199,10 @@ public final class AiRoutineCapturePlugin extends Plugin
 				Thread.sleep(100);
 			}
 			recording = current.state() == CaptureSessionState.RECORDING;
+			if (!recording)
+			{
+				captureRequested.set(false);
+			}
 			completionRequested = false;
 			lastTick = client.getTickCount();
 			publishStatus();
@@ -157,6 +210,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 		catch (Exception ignored)
 		{
 			recording = false;
+			captureRequested.set(false);
 			publishStatus();
 		}
 	}
@@ -257,6 +311,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 			JsonObject value = new JsonObject();
 			value.addProperty("schema", "sc968-capture-status/v1");
 			value.addProperty("state", snapshot.state().name());
+			value.addProperty("logged_in", loggedIn);
 			value.addProperty("run_id", snapshot.runId());
 			value.addProperty("session_id", snapshot.sessionId());
 			value.addProperty("next_tick_sequence", snapshot.nextTickSequence());
