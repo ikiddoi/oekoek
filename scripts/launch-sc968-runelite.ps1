@@ -10,14 +10,20 @@ if ($env:SC968_CAPTURE_ENABLED -ne 'true') {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
-if ($null -eq $maven) {
-    $maven = Get-Command mvn -ErrorAction SilentlyContinue
+$mavenPath = $env:SC968_MAVEN_COMMAND
+if ([string]::IsNullOrWhiteSpace($mavenPath)) {
+    $maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
+    if ($null -eq $maven) {
+        $maven = Get-Command mvn -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $maven) {
+        $mavenPath = if ($maven.Path) { $maven.Path } else { $maven.Source }
+    }
 }
-if ($null -eq $maven) {
-    throw 'Maven is required to launch standard RuneLite'
+if ([string]::IsNullOrWhiteSpace($mavenPath) -or
+    -not (Test-Path -LiteralPath $mavenPath -PathType Leaf)) {
+    throw 'SC968_MAVEN_COMMAND or Maven on PATH is required to launch standard RuneLite'
 }
-$mavenPath = if ($maven.Path) { $maven.Path } else { $maven.Source }
 $repositoryArgument = if ([string]::IsNullOrWhiteSpace($env:SC968_MAVEN_REPO)) {
     $null
 } else {
