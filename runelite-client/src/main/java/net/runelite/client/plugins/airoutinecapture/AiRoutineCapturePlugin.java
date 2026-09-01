@@ -183,6 +183,14 @@ public final class AiRoutineCapturePlugin extends Plugin
 			{
 				return;
 			}
+			// Recorder initialization may outlive one bounded polling window. Resume the already
+			// accepted session instead of POSTing a second start with the original idempotency key
+			// and a new started_at value, which must be rejected as conflicting content.
+			if (current.state() == CaptureSessionState.STARTING)
+			{
+				awaitRecording(current);
+				return;
+			}
 			completionPolicy.reset();
 			CaptureIdentity bound = current.createRun(identities.initial(
 				env("SC968_TASK_KEY", "FISHING_TRAINING"),
@@ -192,20 +200,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 				env("SC968_CATALOG_HASH", ""),
 				env("SC968_CLIENT_ID", "runelite-capture")));
 			current.startSession(bound, new CaptureStart(client.getTickCount(), null, "CHROMASCAPE_WINDOW"));
-			long deadline = System.nanoTime() + Duration.ofSeconds(config.startTimeoutSeconds()).toNanos();
-			while (System.nanoTime() < deadline && current.state() == CaptureSessionState.STARTING)
-			{
-				current.status();
-				Thread.sleep(100);
-			}
-			recording = current.state() == CaptureSessionState.RECORDING;
-			if (!recording)
-			{
-				captureRequested.set(false);
-			}
-			completionRequested = false;
-			lastTick = client.getTickCount();
-			publishStatus();
+			awaitRecording(current);
 		}
 		catch (Exception ignored)
 		{
@@ -213,6 +208,24 @@ public final class AiRoutineCapturePlugin extends Plugin
 			captureRequested.set(false);
 			publishStatus();
 		}
+	}
+
+	private void awaitRecording(CaptureSessionClient current) throws Exception
+	{
+		long deadline = System.nanoTime() + Duration.ofSeconds(config.startTimeoutSeconds()).toNanos();
+		while (System.nanoTime() < deadline && current.state() == CaptureSessionState.STARTING)
+		{
+			current.status();
+			Thread.sleep(100);
+		}
+		recording = current.state() == CaptureSessionState.RECORDING;
+		if (!recording)
+		{
+			captureRequested.set(false);
+		}
+		completionRequested = false;
+		lastTick = client.getTickCount();
+		publishStatus();
 	}
 
 	@Subscribe
