@@ -10,55 +10,19 @@ if ($env:SC968_CAPTURE_ENABLED -ne 'true') {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$mavenPath = $env:SC968_MAVEN_COMMAND
-if ([string]::IsNullOrWhiteSpace($mavenPath)) {
-    $maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
-    if ($null -eq $maven) {
-        $maven = Get-Command mvn -ErrorAction SilentlyContinue
-    }
-    if ($null -ne $maven) {
-        $mavenPath = if ($maven.Path) { $maven.Path } else { $maven.Source }
-    }
-}
-if ([string]::IsNullOrWhiteSpace($mavenPath) -or
-    -not (Test-Path -LiteralPath $mavenPath -PathType Leaf)) {
-    throw 'SC968_MAVEN_COMMAND or Maven on PATH is required to launch standard RuneLite'
-}
-$repositoryArgument = if ([string]::IsNullOrWhiteSpace($env:SC968_MAVEN_REPO)) {
-    $null
-} else {
-    '-Dmaven.repo.local=' + $env:SC968_MAVEN_REPO
+$gradlePath = Join-Path $projectRoot 'gradlew.bat'
+if (-not (Test-Path -LiteralPath $gradlePath -PathType Leaf)) {
+    throw 'The RuneLite Gradle wrapper is required to launch standard RuneLite'
 }
 $contractVersion = $env:SC968_CAPTURE_CONTRACT_VERSION
 if ([string]::IsNullOrWhiteSpace($contractVersion)) {
     throw 'SC968_CAPTURE_CONTRACT_VERSION is required to launch standard RuneLite'
 }
-$contractVersionArgument = '-Dcapture-contract.version=' + $contractVersion
-
-# exec:java runs RuneLite inside Maven's JVM. Developer mode deliberately exits
-# before constructing the client UI when assertions are disabled, so assertions
-# must be enabled before Maven starts rather than passed as an exec argument.
-if ($env:MAVEN_OPTS -notmatch '(?:^|\s)-ea(?:\s|$)') {
-    $env:MAVEN_OPTS = (($env:MAVEN_OPTS, '-ea') -join ' ').Trim()
-}
 
 Write-Output '[SC968] Starting standard RuneLite observation capture. Log in and wait for the FISH NOW prompt.'
 Push-Location $projectRoot
 try {
-    $buildArguments = @('-q', '-DskipTests', $contractVersionArgument)
-    if ($repositoryArgument) { $buildArguments += $repositoryArgument }
-    $buildArguments += @('-pl', 'runelite-client', '-am', 'package')
-    & $mavenPath @buildArguments
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    $launchArguments = @('-q', $contractVersionArgument)
-    if ($repositoryArgument) { $launchArguments += $repositoryArgument }
-    $launchArguments += @(
-        '-f', (Join-Path $projectRoot 'runelite-client\pom.xml'),
-        'org.codehaus.mojo:exec-maven-plugin:3.5.0:java',
-        '-Dexec.mainClass=net.runelite.client.RuneLite',
-        '-Dexec.args=--developer-mode'
-    )
-    & $mavenPath @launchArguments
+    & $gradlePath --no-daemon --no-watch-fs :client:runSc968
     exit $LASTEXITCODE
 } finally {
     Pop-Location

@@ -135,6 +135,14 @@ val shadowJar = tasks.register<Jar>("shadowJar") {
 }
 tasks.assemble { dependsOn(shadowJar) }
 
+tasks.register<JavaExec>("runSc968") {
+    dependsOn(tasks.classes)
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "net.runelite.client.RuneLite"
+    args("--developer-mode")
+    enableAssertions = true
+}
+
 publishing {
     publications {
         create<MavenPublication>("runelite-client") {
