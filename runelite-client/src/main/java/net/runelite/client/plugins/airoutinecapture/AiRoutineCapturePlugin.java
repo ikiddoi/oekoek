@@ -198,7 +198,9 @@ public final class AiRoutineCapturePlugin extends Plugin
 				env("SC968_PROFILE_ID", ""),
 				env("SC968_PROFILE_HASH", ""),
 				env("SC968_CATALOG_HASH", ""),
-				env("SC968_CLIENT_ID", "runelite-capture")));
+				env("SC968_CLIENT_ID", "runelite-capture"),
+				env("SC968_SOURCE_SNAPSHOT_ID", ""),
+				env("SC968_SOURCE_MANIFEST_HASH", "")));
 			current.startSession(bound, new CaptureStart(client.getTickCount(), null, "CHROMASCAPE_WINDOW"));
 			awaitRecording(current);
 		}

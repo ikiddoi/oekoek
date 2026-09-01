@@ -11,7 +11,8 @@ import net.runelite.client.RuneLiteProperties;
 
 public final class RuneLiteCaptureIdentityFactory {
   public CaptureIdentity initial(String taskKey, String settingsHash, String profileId,
-      String profileHash, String catalogHash, String clientId) {
+      String profileHash, String catalogHash, String clientId, String sourceSnapshotId,
+      String sourceManifestHash) {
     JsonObject identity = new JsonObject();
     identity.addProperty("schema", "current-slice-identity/v1");
     JsonObject task = new JsonObject();
@@ -23,7 +24,12 @@ public final class RuneLiteCaptureIdentityFactory {
     identity.add("task", task);
     JsonObject client = new JsonObject();
     client.addProperty("client_id", required(clientId, "client_id")); client.addProperty("client_kind", "RUNELITE_CAPTURE"); client.addProperty("client_build_id", RuneLiteProperties.getCommit() == null ? RuneLiteProperties.getVersion() : RuneLiteProperties.getCommit()); client.addProperty("artifact_digest", artifactDigest()); client.addProperty("adapter_contract", "runelite-capture/v1"); client.addProperty("domain", "RUNELITE");
-    identity.add("client", client); identity.addProperty("control_allowed", false);
+    identity.add("client", client);
+    JsonObject source = new JsonObject();
+    source.addProperty("source_snapshot_id", required(sourceSnapshotId, "source_snapshot_id"));
+    source.addProperty("source_manifest_hash", required(sourceManifestHash, "source_manifest_hash"));
+    identity.add("source", source);
+    identity.addProperty("control_allowed", false);
     return CaptureIdentity.forCreation(JsonCaptureCodec.encode(identity));
   }
   private static String required(String value, String field) { if (value == null || value.isBlank()) throw new IllegalArgumentException("IDENTITY_" + field.toUpperCase() + "_REQUIRED"); return value; }

@@ -20,6 +20,8 @@ public class RuneLiteCaptureSafetyTest {
     assertTrue(text.contains("SC968_CAPTURE_STATUS_FILE"));
     assertTrue(text.contains("sc968-capture-status/v1"));
     assertTrue(text.contains("CaptureCompletion"));
+    assertTrue(text.contains("SC968_SOURCE_SNAPSHOT_ID"));
+    assertTrue(text.contains("SC968_SOURCE_MANIFEST_HASH"));
     assertTrue(text.contains("current.state() == CaptureSessionState.STARTING"));
     assertTrue(text.contains("awaitRecording(current)"));
     assertTrue(text.contains("import net.runelite.client.eventbus.Subscribe;"));
