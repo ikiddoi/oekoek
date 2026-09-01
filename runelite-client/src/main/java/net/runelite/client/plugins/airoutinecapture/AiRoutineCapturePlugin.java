@@ -7,7 +7,6 @@ import com.chromascape.contracts.capture.CaptureSessionSnapshot;
 import com.chromascape.contracts.capture.CaptureSessionState;
 import com.chromascape.contracts.capture.CaptureStart;
 import com.chromascape.contracts.capture.CaptureTransportConfig;
-import com.google.common.eventbus.Subscribe;
 import com.google.gson.JsonObject;
 import java.net.URI;
 import java.nio.file.Files;
@@ -27,6 +26,7 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 

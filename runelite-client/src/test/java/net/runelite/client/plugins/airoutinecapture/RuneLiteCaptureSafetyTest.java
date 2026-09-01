@@ -22,6 +22,8 @@ public class RuneLiteCaptureSafetyTest {
     assertTrue(text.contains("CaptureCompletion"));
     assertTrue(text.contains("current.state() == CaptureSessionState.STARTING"));
     assertTrue(text.contains("awaitRecording(current)"));
+    assertTrue(text.contains("import net.runelite.client.eventbus.Subscribe;"));
+    assertFalse(text.contains("import com.google.common.eventbus.Subscribe;"));
   }
 
   /**
