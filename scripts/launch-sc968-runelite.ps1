@@ -35,6 +35,13 @@ if ([string]::IsNullOrWhiteSpace($contractVersion)) {
 }
 $contractVersionArgument = '-Dcapture-contract.version=' + $contractVersion
 
+# exec:java runs RuneLite inside Maven's JVM. Developer mode deliberately exits
+# before constructing the client UI when assertions are disabled, so assertions
+# must be enabled before Maven starts rather than passed as an exec argument.
+if ($env:MAVEN_OPTS -notmatch '(?:^|\s)-ea(?:\s|$)') {
+    $env:MAVEN_OPTS = (($env:MAVEN_OPTS, '-ea') -join ' ').Trim()
+}
+
 Write-Output '[SC968] Starting standard RuneLite observation capture. Log in and wait for the FISH NOW prompt.'
 Push-Location $projectRoot
 try {
