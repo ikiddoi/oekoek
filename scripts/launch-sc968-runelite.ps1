@@ -29,16 +29,21 @@ $repositoryArgument = if ([string]::IsNullOrWhiteSpace($env:SC968_MAVEN_REPO)) {
 } else {
     '-Dmaven.repo.local=' + $env:SC968_MAVEN_REPO
 }
+$contractVersion = $env:SC968_CAPTURE_CONTRACT_VERSION
+if ([string]::IsNullOrWhiteSpace($contractVersion)) {
+    throw 'SC968_CAPTURE_CONTRACT_VERSION is required to launch standard RuneLite'
+}
+$contractVersionArgument = '-Dcapture-contract.version=' + $contractVersion
 
 Write-Output '[SC968] Starting standard RuneLite observation capture. Log in and wait for the FISH NOW prompt.'
 Push-Location $projectRoot
 try {
-    $buildArguments = @('-q', '-DskipTests')
+    $buildArguments = @('-q', '-DskipTests', $contractVersionArgument)
     if ($repositoryArgument) { $buildArguments += $repositoryArgument }
     $buildArguments += @('-pl', 'runelite-client', '-am', 'package')
     & $mavenPath @buildArguments
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    $launchArguments = @('-q')
+    $launchArguments = @('-q', $contractVersionArgument)
     if ($repositoryArgument) { $launchArguments += $repositoryArgument }
     $launchArguments += @(
         '-f', (Join-Path $projectRoot 'runelite-client\pom.xml'),
