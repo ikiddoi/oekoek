@@ -33,7 +33,7 @@
       </component>
       <component group="com.chromascape.contracts" name="ai-routine-capture-contract" version="1.0.0-sc1452-983d8efa4276">
          <artifact name="ai-routine-capture-contract-1.0.0-sc1452-983d8efa4276.jar">
-            <sha256 value="dfb8dbee63c10937be9886c3c1f883f9a72fdef5a21a8b7731c509d3f8ec4367" origin="SC-968 reproducible integrated capture contract"/>
+            <sha256 value="9ac801afe4107d0fb7e41fe556f0845f2ff4d10e8a0b928dfc83e0e328cf5a47" origin="SC-968 reproducible integrated capture contract"/>
          </artifact>
       </component>
       <component group="com.fifesoft" name="autocomplete" version="3.1.1">
