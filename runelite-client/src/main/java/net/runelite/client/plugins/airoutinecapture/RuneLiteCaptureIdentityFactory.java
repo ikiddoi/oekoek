@@ -25,10 +25,12 @@ public final class RuneLiteCaptureIdentityFactory {
     JsonObject client = new JsonObject();
     client.addProperty("client_id", required(clientId, "client_id")); client.addProperty("client_kind", "RUNELITE_CAPTURE"); client.addProperty("client_build_id", RuneLiteProperties.getCommit() == null ? RuneLiteProperties.getVersion() : RuneLiteProperties.getCommit()); client.addProperty("artifact_digest", artifactDigest()); client.addProperty("adapter_contract", "runelite-capture/v1"); client.addProperty("domain", "RUNELITE");
     identity.add("client", client);
-    JsonObject source = new JsonObject();
-    source.addProperty("source_snapshot_id", required(sourceSnapshotId, "source_snapshot_id"));
-    source.addProperty("source_manifest_hash", required(sourceManifestHash, "source_manifest_hash"));
-    identity.add("source", source);
+    // A human capture has no authoritative managed-task source bundle. Never emit a partial
+    // source group; the backend independently verifies commit from the packaged artifact instead.
+    if ((sourceSnapshotId != null && !sourceSnapshotId.isBlank())
+        || (sourceManifestHash != null && !sourceManifestHash.isBlank())) {
+      throw new IllegalArgumentException("RUNELITE_CAPTURE_TASK_SOURCE_UNSUPPORTED");
+    }
     identity.addProperty("control_allowed", false);
     return CaptureIdentity.forCreation(JsonCaptureCodec.encode(identity));
   }
