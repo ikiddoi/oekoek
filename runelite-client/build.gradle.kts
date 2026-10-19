@@ -23,6 +23,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import java.util.jar.JarFile
 import java.io.ByteArrayOutputStream
 import java.util.Properties
 
@@ -108,6 +109,18 @@ dependencies {
     testImplementation(libs.guice.testlib)
     testImplementation(libs.guice.grapher)
     testImplementation(libs.okhttp.mockserver)
+}
+
+// SC-663: pin source-less capture to the exact packaged bytes and full source revision.
+val sc663SourceCommit = providers.exec {
+    commandLine("git", "rev-parse", "--verify", "HEAD^{commit}")
+}.standardOutput.asText.map { it.trim() }
+val sc663CaptureBuild = providers.exec {
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+}.standardOutput.asText.map { it.trim() }
+tasks.withType<Jar>().configureEach {
+    manifest.attributes["SC663-Build-Id"] = sc663CaptureBuild.get()
+    manifest.attributes["SC663-Commit-Id"] = sc663SourceCommit.get()
 }
 
 val shadowJar = tasks.register<Jar>("shadowJar") {
@@ -219,4 +232,54 @@ tasks.withType<Test> {
 
 tasks.javadoc {
     title = "RuneLite Client ${project.version} API"
+}
+
+// Manifest-only verification artifact uses exactly the same metadata configuration as client JARs.
+tasks.register<Jar>("sc663ArtifactMetadataFixture") {
+    group = "verification"
+    archiveFileName.set("sc663-client-metadata.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("sc663-artifact-proof"))
+    doLast {
+        JarFile(archiveFile.get().asFile).use { artifact ->
+            val attributes = artifact.manifest.mainAttributes
+            check(attributes.getValue("SC663-Build-Id").isNotBlank())
+            check(attributes.getValue("SC663-Commit-Id").matches(Regex("[0-9a-f]{40}")))
+        }
+    }
+}
+
+// Isolated capture producer gate: never reads or cleans shared client compile outputs.
+val sc663CaptureFactoryCompile = tasks.register<JavaCompile>("sc663CaptureFactoryCompile") {
+    source("src/main/java/net/runelite/client/plugins/airoutinecapture/RuneLiteCaptureIdentityFactory.java",
+        "src/main/java/net/runelite/client/RuneLiteProperties.java")
+
+    options.sourcepath = files("src/main/java")
+    options.release.set(17)
+    classpath = configurations.compileClasspath.get()
+    destinationDirectory.set(layout.buildDirectory.dir("sc663-capture-factory/main"))
+}
+val sc663CaptureFactoryTestCompile = tasks.register<JavaCompile>("sc663CaptureFactoryTestCompile") {
+    source("src/test/java/net/runelite/client/plugins/airoutinecapture/RuneLiteCaptureIdentityFactoryTest.java")
+
+    options.sourcepath = files("src/test/java", "src/main/java")
+    options.release.set(17)
+    classpath = files(sc663CaptureFactoryCompile.flatMap { it.destinationDirectory }, configurations.testCompileClasspath)
+    destinationDirectory.set(layout.buildDirectory.dir("sc663-capture-factory/test"))
+}
+val sc663CaptureFactoryResources = tasks.register<Copy>("sc663CaptureFactoryResources") {
+    from("src/main/resources/net/runelite/client/runelite.properties") {
+        into("net/runelite/client")
+        filter { line: String -> line.replace("\${project.version}", project.version.toString())
+            .replace("\${git.commit.id.abbrev}", sc663CaptureBuild.get())
+            .replace("\${microbot.commit.sha}", sc663CaptureBuild.get()) }
+    }
+    into(layout.buildDirectory.dir("sc663-capture-factory/resources"))
+}
+tasks.register<Test>("sc663CaptureFactoryTest") {
+    group = "verification"
+    dependsOn(sc663CaptureFactoryTestCompile, sc663CaptureFactoryResources)
+    testClassesDirs = files(sc663CaptureFactoryTestCompile.flatMap { it.destinationDirectory })
+    classpath = files(testClassesDirs, sc663CaptureFactoryCompile.flatMap { it.destinationDirectory },
+        layout.buildDirectory.dir("sc663-capture-factory/resources"), configurations.testRuntimeClasspath)
+    useJUnit()
 }
