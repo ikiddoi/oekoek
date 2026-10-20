@@ -67,6 +67,8 @@ public final class AiRoutineCapturePlugin extends Plugin
 	private volatile Path statusPath;
 	private volatile Path startTriggerPath;
 	private volatile boolean loggedIn;
+	private volatile GameState gameState = GameState.UNKNOWN;
+	private volatile String lastStopReason;
 	private final java.util.concurrent.atomic.AtomicBoolean captureRequested =
 		new java.util.concurrent.atomic.AtomicBoolean();
 
@@ -97,7 +99,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		lifecycle.submit(() -> stopCapture(true));
+		lifecycle.submit(() -> stopCapture(true, null));
 		statusWriter.shutdownNow();
 		lifecycle.shutdown();
 		try
@@ -119,7 +121,16 @@ public final class AiRoutineCapturePlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		loggedIn = event.getGameState() == GameState.LOGGED_IN;
+		GameState observed = event.getGameState();
+		gameState = observed;
+		// Loading a region is not a new authenticated session. Keep an existing capture and
+		// login latch, but do not infer login from the initial loading screen.
+		if (observed == GameState.LOADING)
+		{
+			publishStatus();
+			return;
+		}
+		loggedIn = observed == GameState.LOGGED_IN;
 		if (loggedIn)
 		{
 			maybeStartCapture();
@@ -127,7 +138,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 		}
 		if (recording)
 		{
-			lifecycle.submit(() -> stopCapture(false));
+			lifecycle.submit(() -> stopCapture(false, "GAME_STATE_" + observed.name()));
 		}
 		// Without a trigger the plugin keeps its original behaviour, which includes recapturing
 		// after a reconnect. A triggered run is one demonstration per process and stays latched.
@@ -157,7 +168,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 	 */
 	private void maybeStartCapture()
 	{
-		if (!enabled() || !loggedIn || recording)
+		if (!enabled() || !loggedIn || gameState != GameState.LOGGED_IN || recording)
 		{
 			return;
 		}
@@ -192,6 +203,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 				return;
 			}
 			completionPolicy.reset();
+			lastStopReason = null;
 			CaptureIdentity bound = current.createRun(identities.initial(
 				env("SC968_TASK_KEY", "FISHING_TRAINING"),
 				env("SC968_SETTINGS_HASH", ""),
@@ -233,7 +245,7 @@ public final class AiRoutineCapturePlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (!recording || !enabled())
+		if (!recording || !enabled() || gameState != GameState.LOGGED_IN)
 		{
 			return;
 		}
@@ -242,14 +254,14 @@ public final class AiRoutineCapturePlugin extends Plugin
 		if (!completionRequested && completionPolicy.satisfied(lastTick))
 		{
 			completionRequested = true;
-			lifecycle.submit(() -> stopCapture(true));
+			lifecycle.submit(() -> stopCapture(true, null));
 		}
 	}
 
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		if (!recording || !enabled())
+		if (!recording || !enabled() || gameState != GameState.LOGGED_IN)
 		{
 			return;
 		}
@@ -264,15 +276,27 @@ public final class AiRoutineCapturePlugin extends Plugin
 		publishStatus();
 	}
 
-	private void stopCapture(boolean complete)
+	private void stopCapture(boolean complete, String stopReason)
 	{
 		CaptureSessionClient current = capture;
 		if (current == null)
 		{
 			return;
 		}
+		// An interruption may have been queued while completion was still in flight.
+		// Shutdown also runs after successful completion; neither may rewrite that result.
+		if (current.state() == CaptureSessionState.COMPLETED)
+		{
+			recording = false;
+			publishStatus();
+			return;
+		}
 		if (!recording || !complete)
 		{
+			if (stopReason != null)
+			{
+				lastStopReason = stopReason;
+			}
 			current.abort();
 			recording = false;
 			publishStatus();
@@ -327,6 +351,11 @@ public final class AiRoutineCapturePlugin extends Plugin
 			value.addProperty("schema", "sc968-capture-status/v1");
 			value.addProperty("state", snapshot.state().name());
 			value.addProperty("logged_in", loggedIn);
+			value.addProperty("game_state", gameState.name());
+			if (lastStopReason != null)
+			{
+				value.addProperty("last_stop_reason", lastStopReason);
+			}
 			value.addProperty("run_id", snapshot.runId());
 			value.addProperty("session_id", snapshot.sessionId());
 			value.addProperty("next_tick_sequence", snapshot.nextTickSequence());
