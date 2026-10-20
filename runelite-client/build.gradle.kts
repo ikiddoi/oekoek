@@ -168,7 +168,6 @@ publishing {
 val assemble = tasks.withType<net.runelite.gradle.assemble.AssembleTask> {
     scriptDirectory = file("src/main/scripts")
     outputDirectory = sourceSets.main.map { File(it.output.resourcesDir, "runelite") }
-    componentsFile = file("../runelite-api/src/main/interfaces/interfaces.toml")
     longSupport = true
 }
 
@@ -191,6 +190,11 @@ tasks.processResources {
         commandLine("git", "status", "--short")
         standardOutput = dirty
     }
+
+    // These values are expanded into runelite.properties. Without declared inputs an
+    // incremental build can keep the previous capture build while its JAR manifest updates.
+    inputs.property("gitCommit", commit.toString().trim())
+    inputs.property("gitDirty", dirty.toString().isNotBlank())
 
     filesMatching("net/runelite/client/runelite.properties") {
         filter { it.replace("\${project.version}", project.version.toString()) }
@@ -267,6 +271,8 @@ val sc663CaptureFactoryTestCompile = tasks.register<JavaCompile>("sc663CaptureFa
     destinationDirectory.set(layout.buildDirectory.dir("sc663-capture-factory/test"))
 }
 val sc663CaptureFactoryResources = tasks.register<Copy>("sc663CaptureFactoryResources") {
+    inputs.property("projectVersion", project.version.toString())
+    inputs.property("captureBuild", sc663CaptureBuild)
     from("src/main/resources/net/runelite/client/runelite.properties") {
         into("net/runelite/client")
         filter { line: String -> line.replace("\${project.version}", project.version.toString())
